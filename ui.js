@@ -18,16 +18,11 @@ export function removerAlocacaoMateria(materiaId) {
     if (alocacaoCreditos[materiaId]) {
         alocacaoCreditos[materiaId]--;
     }
-    // Retorna a quantidade de créditos alocados restantes para essa matéria
     return alocacaoCreditos[materiaId] || 0;
 }
 
 export function updateAll() { atualizarEstadoPrerequisitos(); atualizarContador(); }
 
-/**
- * [VERSÃO FINAL COM TEXTO EM 2 LINHAS] Cria e retorna um elemento DOM para uma única grade de semestre.
- * Permite que o nome da matéria ocupe até 2 linhas antes de truncar.
- */
 export function criarElementoGradeParaPDF(semestre, index) {
     const gradeDiv = document.createElement('div');
     gradeDiv.className = 'periodo-grade-semanal';
@@ -41,7 +36,6 @@ export function criarElementoGradeParaPDF(semestre, index) {
     titulo.textContent = semestre.nome;
     gradeHeader.appendChild(titulo);
 
-    // Etapa 1: Construir a matriz virtual da grade (lógica inalterada)
     const numSlots = HORARIOS_PADRAO.length;
     const numDias = 5;
     const gradeMatrix = Array(numSlots).fill(null).map(() => Array(numDias).fill(null));
@@ -58,7 +52,6 @@ export function criarElementoGradeParaPDF(semestre, index) {
         });
     });
 
-    // Etapa 2: Construir o HTML a partir da matriz com as alterações visuais
     const tabela = document.createElement('table');
     tabela.className = 'grade-tabela';
     const diasSemana = ["Horários", "Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
@@ -79,12 +72,7 @@ export function criarElementoGradeParaPDF(semestre, index) {
                 tableHTML += '<td></td>';
             } else {
                 const nomeMateria = materia.nome;
-                
-                // Estilo para o container colorido
                 const divStyle = `height: calc(100% - 2px); margin: 1px; display: flex; justify-content: center; align-items: center; overflow: hidden;`;
-                
-                // ===== A ALTERAÇÃO ESTÁ AQUI =====
-                // Estilo para o texto, permitindo até 2 linhas antes de truncar com "..."
                 const spanStyle = `display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; text-align: center; font-size: 0.95em; line-height: 1.2; max-height: 2.4em;`;
                 
                 tableHTML += `<td>
@@ -104,25 +92,15 @@ export function criarElementoGradeParaPDF(semestre, index) {
     return gradeDiv;
 }
 
-/**
- * [VERSÃO FINAL E CORRETA - MÉTODO DA PÁGINA ÚNICA]
- * Gera um PDF com múltiplas páginas a partir de um único elemento HTML longo,
- * deixando a biblioteca html2pdf gerenciar a paginação.
- */
 export async function exportarPlanoOtimizadoParaPDF(planoGerado) {
-    // 1. Cria um container que servirá como nossa "página longa"
     const longPageContainer = document.createElement('div');
-    // Definir uma largura ajuda o html2canvas a renderizar de forma consistente
     longPageContainer.style.width = '10.5in'; 
 
-    // 2. Anexa a grade de cada semestre ao container.
-    // A função criarElementoGradeParaPDF já adiciona a quebra de página (page-break-before)
     planoGerado.forEach((semestre, index) => {
         const elementoGrade = criarElementoGradeParaPDF(semestre, index);
         longPageContainer.appendChild(elementoGrade);
     });
 
-    // 3. Define as opções, incluindo o modo de quebra de página
     const hoje = new Date();
     const nomeArquivo = `plano_de_estudos_final_${hoje.toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
     const opt = {
@@ -131,13 +109,9 @@ export async function exportarPlanoOtimizadoParaPDF(planoGerado) {
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
-        // Habilita o modo de quebra de página da biblioteca, que respeitará nosso CSS
         pagebreak: { mode: 'css' }
     };
 
-    // 4. Gera o PDF a partir do container com todas as grades.
-    // A biblioteca fará todo o trabalho de paginação para nós.
-    // O 'await' garante que a tela de carregamento só suma quando o PDF for salvo.
     await html2pdf().from(longPageContainer).set(opt).save();
 }
 
@@ -164,7 +138,7 @@ export function criarMateriaItemDOM(materia, tipo, cor) {
 }
 
 export function inicializarUI() {
-    // O cálculo do total de créditos agora é feito aqui.
+    totalCreditosObrigatorios = 0;
     for (const periodo in DADOS_CURSO) {
         if (periodo !== 'optativas' && periodo !== 'outros') {
             DADOS_CURSO[periodo].forEach(materia => {
@@ -176,6 +150,16 @@ export function inicializarUI() {
 
 export function gerarSidebar() {
     sidebarContent.innerHTML = '';
+    
+    const extraContainer = document.createElement('div');
+    extraContainer.style.cssText = 'padding: 10px; margin-bottom: 15px; background: #e9ecef; border-radius: 5px; display: flex; flex-direction: column; gap: 5px;';
+    extraContainer.innerHTML = `
+        <label for="optativas-concluidas" style="font-size: 0.85em; font-weight: bold; color: #495057;">Créditos de Optativas/Eletivas:</label>
+        <input type="number" id="optativas-concluidas" value="0" min="0" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px;">
+    `;
+    sidebarContent.appendChild(extraContainer);
+    extraContainer.querySelector('input').addEventListener('input', updateAll);
+
     for (const periodo in DADOS_CURSO) {
         const accordeon = document.createElement('div'); accordeon.className = 'periodo-accordeon';
         const header = document.createElement('div'); header.className = 'periodo-header'; header.dataset.target = `lista-${periodo}`;
@@ -218,8 +202,14 @@ export function gerarGradePeriodo(nome) {
     const titulo = document.createElement('h3');
     titulo.textContent = nome;
     titulo.contentEditable = true;
+    
     const controlesDiv = document.createElement('div');
     controlesDiv.className = 'controles';
+    
+    const priorizarTccLabel = document.createElement('label');
+    priorizarTccLabel.style.cssText = 'font-size: 0.8em; display: flex; align-items: center; gap: 5px; cursor: pointer; color: #495057; font-weight: bold; margin-right: 5px;';
+    priorizarTccLabel.innerHTML = `<input type="checkbox" id="priorizar-tcc-check"> Priorizar TCC`;
+
     const limparBtn = document.createElement('button');
     limparBtn.className = 'btn-acao limpar-grade-btn';
     limparBtn.innerHTML = '&#x1F5D1;';
@@ -231,8 +221,9 @@ export function gerarGradePeriodo(nome) {
     otimizarBtn.className = 'btn-acao otimizar-grade-btn';
     otimizarBtn.innerHTML = '✨ Gerar Grade Otimizada';
     otimizarBtn.title = 'Gera um plano de estudos otimizado para concluir o curso';
-    controlesDiv.append(limparBtn, exportBtn, otimizarBtn);
+    controlesDiv.append(priorizarTccLabel, limparBtn, exportBtn, otimizarBtn);
     gradeHeader.append(titulo, controlesDiv);
+    
     const tabela = document.createElement('table');
     tabela.className = 'grade-tabela';
     const diasSemana = ["Horários", "Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
@@ -304,6 +295,11 @@ export function atualizarEstadoPrerequisitos() {
         const materia = findMateriaById(chk.dataset.materiaId);
         if (materia) creditosConcluidos += materia.creditos;
     });
+
+    const inputExtras = document.getElementById('optativas-concluidas');
+    const creditosExtras = inputExtras ? parseInt(inputExtras.value) || 0 : 0;
+    const totalParaPrereq = creditosConcluidos + creditosExtras;
+
     for (const periodo in DADOS_CURSO) {
         if (periodo === 'optativas' || periodo === 'outros') continue;
         DADOS_CURSO[periodo].forEach(materia => {
@@ -318,7 +314,7 @@ export function atualizarEstadoPrerequisitos() {
                 }
             }
             if (requisitosCumpridos && preRequisitos.creditos) {
-                if (creditosConcluidos < preRequisitos.creditos) requisitosCumpridos = false;
+                if (totalParaPrereq < preRequisitos.creditos) requisitosCumpridos = false;
             }
             const materiaDiv = document.getElementById(materia.id);
             if(materiaDiv) materiaDiv.classList.toggle('prereq-nao-cumprido', !requisitosCumpridos);
@@ -330,12 +326,19 @@ export function atualizarContador() {
     const totalCheckbox = document.querySelectorAll('.materia-checkbox').length;
     const concluidas = document.querySelectorAll('.materia-checkbox:checked').length;
     const faltam = totalCheckbox - concluidas;
-    const creditosFaltantes = totalCreditosObrigatorios - creditosConcluidos;
-    document.getElementById('contador-progresso').innerHTML = `Matérias Cursadas: <strong>${concluidas}</strong> | Faltam: <strong>${faltam}</strong><br>Créditos Concluídos: <strong>${creditosConcluidos}</strong> | Faltam: <strong>${creditosFaltantes}</strong>`;
+
+    const inputExtras = document.getElementById('optativas-concluidas');
+    const creditosExtras = inputExtras ? parseInt(inputExtras.value) || 0 : 0;
+    const totalGeralConcluido = creditosConcluidos + creditosExtras;
+    const creditosFaltantes = Math.max(0, totalCreditosObrigatorios - creditosConcluidos);
+
+    document.getElementById('contador-progresso').innerHTML = `Matérias Cursadas: <strong>${concluidas}</strong> | Faltam: <strong>${faltam}</strong><br>Créditos Concluídos: <strong>${totalGeralConcluido}</strong> | Faltam: <strong>${creditosFaltantes}</strong>`;
 }
 
 export function exportarGradeParaPDF(gradeElement) {
     const botoes = gradeElement.querySelectorAll('.btn-acao');
+    const checkboxTcc = gradeElement.querySelector('#priorizar-tcc-check')?.parentElement;
+    if (checkboxTcc) checkboxTcc.style.visibility = 'hidden';
     botoes.forEach(b => b.style.visibility = 'hidden');
     
     const titulo = gradeElement.querySelector('h3').textContent || 'periodo';
@@ -348,5 +351,6 @@ export function exportarGradeParaPDF(gradeElement) {
 
     html2pdf().from(gradeElement).set(opt).save().then(() => {
         botoes.forEach(b => b.style.visibility = 'visible');
+        if (checkboxTcc) checkboxTcc.style.visibility = 'visible';
     });
 }

@@ -20,10 +20,7 @@ import {
 import { gerarPlanoOtimizado } from './planner.js';
 import { findMateriaById } from './utils.js';
 
-
-    
 let draggedItem = null;
-
 
 function handleDrop(e) {
     e.preventDefault();
@@ -110,7 +107,6 @@ function handleSidebarClick(e) {
     }
 }
 
-
 function handleDragStart(e) {
     const target = e.target;
     let data = {};
@@ -132,8 +128,13 @@ function handleDragStart(e) {
                         if (document.querySelector(`.materia-agendada[data-materia-id="${preReqId}"]`)) erros.push(findMateriaById(preReqId).nome + " (não pode cursar com pré-requisito no mesmo período)");
                     });
                 }
-                if (materia.preRequisitos.creditos && creditosConcluidos < materia.preRequisitos.creditos) {
-                    erros.push(`${materia.preRequisitos.creditos} créditos concluídos (você tem ${creditosConcluidos})`);
+                if (materia.preRequisitos.creditos) {
+                    const inputExtras = document.getElementById('optativas-concluidas');
+                    const creditosExtras = inputExtras ? parseInt(inputExtras.value) || 0 : 0;
+                    const totalGeral = creditosConcluidos + creditosExtras;
+                    if (totalGeral < materia.preRequisitos.creditos) {
+                        erros.push(`${materia.preRequisitos.creditos} créditos concluídos (você tem ${totalGeral})`);
+                    }
                 }
                 if (erros.length > 0) alert(`Pré-requisitos não cumpridos para ${materia.nome}:\n\n- ${[...new Set(erros)].join('\n- ')}`);
             }
@@ -150,12 +151,9 @@ function handleDragStart(e) {
     setTimeout(() => target.classList.add('dragging'), 0);
 }
 
-// Cole esta função completa dentro de js/main.js
-
 async function handleGradeClick(e) {
     const target = e.target;
     
-    // --- Lógica para o botão de Otimizar ---
     if (target.closest('.otimizar-grade-btn')) {
         const loadingOverlay = document.getElementById('loading-overlay');
         loadingOverlay.classList.remove('hidden');
@@ -178,13 +176,14 @@ async function handleGradeClick(e) {
         return;
     }
 
-    // --- Lógica para o botão Limpar Grade ---
     if (target.closest('.limpar-grade-btn')) {
         if (confirm("Você tem certeza que deseja limpar toda a grade e o progresso? Esta ação não pode ser desfeita.")) {
             const gradeContainer = target.closest('.periodo-grade-semanal');
             gradeContainer.querySelectorAll('.materia-agendada').forEach(el => el.remove());
             document.querySelectorAll('.materia-checkbox:checked').forEach(chk => chk.click());
             document.querySelectorAll('.remover-custom-btn').forEach(btn => btn.click());
+            const extraInput = document.getElementById('optativas-concluidas');
+            if (extraInput) extraInput.value = 0;
             
             resetarAlocacaoCreditos();
             updateAll();
@@ -192,13 +191,11 @@ async function handleGradeClick(e) {
         return;
     }
 
-    // --- Lógica para o botão Exportar PDF (da grade manual) ---
     if (target.matches('.export-periodo-pdf-btn')) {
         exportarGradeParaPDF(target.closest('.periodo-grade-semanal'));
         return;
     }
 
-    // --- Lógica para o botão de remover matéria individual ---
     const removerBtn = target.closest('.remover-materia-btn');
     if (removerBtn) {
         const materiaAgendada = removerBtn.closest('.materia-agendada');
@@ -224,26 +221,15 @@ async function handleGradeClick(e) {
 }
 
 function init() {
-    // A lógica de cálculo foi removida daqui.
-    
-    // Agora apenas chamamos as funções de inicialização da UI.
-    inicializarUI(); // Nova função que será criada no ui.js
+    inicializarUI();
     gerarSidebar();
     
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = hoje.getMonth() + 1;
-    const semestre = (mes >= 1 && mes <= 7) ? 1 : 2;
-    gerarGradePeriodo(`${ano}.${semestre}`);
+    // Data inicial fixada em 2026.1
+    gerarGradePeriodo(`2026.1`);
     
     updateAll();
 }
 
-// ==========================================================
-// ADICIONE ESTE BLOCO NO FINAL DO SEU ARQUIVO js/main.js
-// ==========================================================
-
-// Etapa Final: Adiciona os "escutadores" de eventos aos elementos
 gradesWrapper.addEventListener('dragover', e => { e.preventDefault(); const d = e.target.closest('.dropzone'); if (d) d.classList.add('drag-over'); });
 gradesWrapper.addEventListener('dragleave', e => { const d = e.target.closest('.dropzone'); if (d) d.classList.remove('drag-over'); });
 gradesWrapper.addEventListener('drop', handleDrop);
@@ -252,5 +238,4 @@ sidebarContent.addEventListener('click', handleSidebarClick);
 document.addEventListener('dragstart', handleDragStart);
 document.addEventListener('dragend', e => { if (draggedItem) draggedItem.classList.remove('dragging'); draggedItem = null; });
 
-// Chama a função init() para construir a interface e iniciar a aplicação
 init();

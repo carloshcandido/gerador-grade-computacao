@@ -1,7 +1,5 @@
 export const DADOS_CURSO = {
     "1": [
-        { id: '0P1', nome: 'Créditos de Optativas', creditos: 13, preRequisitos: {}, horarios: [] },
-        { id: '0P2', nome: 'Créditos de Eletivas', creditos: 6, preRequisitos: {}, horarios: [] },
         { id: '1P1', nome: 'Introdução a Engenharia', creditos: 2, preRequisitos: {}, horarios: [{ dia: 4, slots: [0, 1] }] },
         { id: '1P2', nome: 'Administração e Organização Empresarial', creditos: 2, preRequisitos: {}, horarios: [{ dia: 1, slots: [5, 6] }] },
         { id: '1P3', nome: 'Geometria Analítica', creditos: 3, preRequisitos: {}, horarios: [{ dia: 2, slots: [5, 6] }, { dia: 2, slots: [8] }] },
