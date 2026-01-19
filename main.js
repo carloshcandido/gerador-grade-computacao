@@ -1,58 +1,31 @@
 import { DADOS_CURSO } from './materias.js';
-import { CORES_DISPONIVEIS } from './config.js';
-import { inicializarUI, gerarSidebar, gerarGradePeriodo, updateAll, alocacaoCreditos, removerAlocacaoMateria, agendarMateriaNoSlot, exportarGradeParaPDF, exportarPlanoOtimizadoParaPDF, verificarConclusaoPeriodo, gradesWrapper, sidebarContent } from './ui.js';
+import { inicializarUI, gerarSidebar, gerarGradePeriodo, updateAll, gradesWrapper, sidebarContent } from './ui.js';
 import { gerarPlanoOtimizado } from './planner.js';
-import { findMateriaById } from './utils.js';
+import { exportarPlanoOtimizadoParaPDF } from './ui.js';
 
-let draggedItem = null;
+document.addEventListener('DOMContentLoaded', () => {
+    inicializarUI();
+    gerarSidebar();
+    gerarGradePeriodo("2026.1");
+    updateAll();
 
-function handleSidebarClick(e) {
-    const t = e.target;
-    if (t.classList.contains('materia-checkbox')) {
-        const div = document.getElementById(t.dataset.materiaId);
-        if (div?.classList.contains('prereq-nao-cumprido') && t.checked) {
-            t.checked = false; alert("Pré-requisitos pendentes!"); return;
+    sidebarContent.addEventListener('click', e => {
+        if (e.target.classList.contains('materia-checkbox')) updateAll();
+        if (e.target.classList.contains('periodo-checkbox')) {
+            const p = e.target.dataset.periodo;
+            document.querySelectorAll(`.materia-checkbox[data-periodo-pai="${p}"]`).forEach(c => c.checked = e.target.checked);
+            updateAll();
         }
-        div?.classList.toggle('concluida', t.checked);
-        verificarConclusaoPeriodo(t.dataset.periodoPai); updateAll();
-    }
-    if (t.closest('.periodo-header') && !t.matches('input')) {
-        const lista = t.closest('.periodo-header').nextElementSibling;
-        lista.classList.toggle('hidden');
-    }
-}
+        if (e.target.closest('.periodo-header')) {
+            const list = e.target.closest('.periodo-accordeon').querySelector('.lista-materias-container');
+            list.classList.toggle('hidden');
+        }
+    });
 
-async function handleGradeClick(e) {
-    const t = e.target;
-    if (t.closest('.otimizar-grade-btn')) {
-        document.getElementById('loading-overlay').classList.remove('hidden');
-        setTimeout(async () => {
-            try {
-                const p = await gerarPlanoOtimizado();
-                if (p.length > 0) await exportarPlanoOtimizadoParaPDF(p);
-            } catch (err) { alert(err.message); }
-            finally { document.getElementById('loading-overlay').classList.add('hidden'); }
-        }, 100);
-    }
-    if (t.closest('.remover-materia-btn')) {
-        const ag = t.closest('.materia-agendada');
-        removerAlocacaoMateria(ag.dataset.materiaId); ag.remove(); updateAll();
-    }
-    if (t.closest('.limpar-grade-btn')) { if (confirm("Limpar?")) location.reload(); }
-}
-
-function init() { inicializarUI(); gerarSidebar(); gerarGradePeriodo("2026.1"); updateAll(); }
-
-gradesWrapper.addEventListener('click', handleGradeClick);
-sidebarContent.addEventListener('click', handleSidebarClick);
-document.addEventListener('dragstart', e => { if (e.target.matches('.materia, .materia-agendada')) draggedItem = e.target; });
-document.addEventListener('dragover', e => e.preventDefault());
-document.addEventListener('drop', e => {
-    const dz = e.target.closest('.dropzone');
-    if (dz && draggedItem) {
-        const m = findMateriaById(draggedItem.id || draggedItem.dataset.materiaId);
-        if (m) agendarMateriaNoSlot(m, draggedItem.dataset.cor || 'cor-1', dz);
-    }
+    gradesWrapper.addEventListener('click', async e => {
+        if (e.target.classList.contains('otimizar-grade-btn')) {
+            const p = await gerarPlanoOtimizado();
+            await exportarPlanoOtimizadoParaPDF(p);
+        }
+    });
 });
-
-init();
