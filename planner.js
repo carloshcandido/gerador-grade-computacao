@@ -1,78 +1,94 @@
 import { DADOS_CURSO } from './materias.js';
 import { findMateriaById } from './utils.js';
 
-const PESOS_CAMINHO_CRITICO = {
-    '7P4': 100, '9P2': 90, '10P1': 80, 
-    '5P4': 75, '6P4': 70, '6P5': 70, 
-    '7P1': 65, '6P1': 60, '4P1': 55
-};
-
 export async function gerarPlanoOtimizado() {
     const priorizarTcc = document.getElementById('priorizar-tcc-check')?.checked;
-    const priorizarTempo = document.getElementById('priorizar-tempo-check')?.checked;
     const optativasInput = document.getElementById('optativas-concluidas');
     const creditosIniciais = optativasInput ? parseInt(optativasInput.value) || 0 : 0;
 
-    let materiasConcluidasSet = new Set();
-    let totalCreditosAcumulados = creditosIniciais;
+    let materiasIniciaisSet = new Set();
+    let creditosIniciaisAcumulados = creditosIniciais;
 
     document.querySelectorAll('.materia-checkbox:checked').forEach(chk => {
-        materiasConcluidasSet.add(chk.dataset.materiaId);
+        materiasIniciaisSet.add(chk.dataset.materiaId);
         const m = findMateriaById(chk.dataset.materiaId);
-        if (m) totalCreditosAcumulados += m.creditos;
+        if (m) creditosIniciaisAcumulados += m.creditos;
     });
 
-    let materiasPendentes = getMateriasPendentes();
-    const planoGerado = [];
-    let anoAtual = 2026;
-    let semestreN = 1;
+    let materiasPendentesGlobais = getMateriasPendentes();
+    
+    let melhorPlano = null;
+    let menorTempo = Infinity;
 
-    let semestreCounter = 0;
-    while (materiasPendentes.length > 0) {
-        semestreCounter++;
-        if (semestreCounter > 20) break;
+    // Função de recursão para testar combinações
+    function simular(materiasRestantes, concluidasSet, totalCreditos, planoAtual, ano, semN) {
+        if (materiasRestantes.length === 0) {
+            if (planoAtual.length < menorTempo) {
+                menorTempo = planoAtual.length;
+                melhorPlano = JSON.parse(JSON.stringify(planoAtual));
+            }
+            return;
+        }
 
-        const semestreAtual = { nome: `${anoAtual}.${semestreN}`, materiasAlocadas: [] };
-        
-        // 1. Filtra quem pode ser cursado agora
-        let candidatas = materiasPendentes.filter(m => 
-            verificarPreRequisitosCumpridos(m, materiasConcluidasSet, totalCreditosAcumulados)
+        if (planoAtual.length >= menorTempo || planoAtual.length > 15) return;
+
+        // 1. Identifica todas as matérias que PODEM ser feitas agora
+        let disponiveis = materiasRestantes.filter(m => 
+            verificarPreRequisitosCumpridos(m, concluidasSet, totalCreditos)
         );
 
-        // 2. Ordena por peso (se priorizarTempo) ou período
-        candidatas.sort((a, b) => {
-            if (priorizarTempo) {
-                const pA = PESOS_CAMINHO_CRITICO[a.id] || 0;
-                const pB = PESOS_CAMINHO_CRITICO[b.id] || 0;
-                if (pA !== pB) return pB - pA;
-            }
-            return a.periodoOriginal - b.periodoOriginal;
-        });
-
-        // 3. Tenta a melhor combinação (Greedy com re-check de conflitos)
-        // Em vez de só iterar uma vez, tentamos preencher o máximo de slots
-        for (const materia of candidatas) {
-            if (!verificarConflitoDeHorario(materia, semestreAtual.materiasAlocadas)) {
-                semestreAtual.materiasAlocadas.push(materia);
+        // 2. TCC check: Se priorizar TCC, removemos candidatas que não sejam TCC se o TCC estiver disponível
+        if (priorizarTcc) {
+            const tccDisponivel = disponiveis.find(m => ['7P4', '9P2', '10P1'].includes(m.id));
+            if (tccDisponivel) {
+                // Forçamos o TCC na lista, mas mantemos as outras para preencher horário
+                disponiveis = [tccDisponivel, ...disponiveis.filter(m => m.id !== tccDisponivel.id)];
             }
         }
 
-        // Se o semestre ficou muito vazio e temos matérias de períodos baixos sobrando, 
-        // a lógica de conflito pode ter sido muito restritiva. 
-        // Aqui o algoritmo aceita o resultado e atualiza o estado.
-        if (semestreAtual.materiasAlocadas.length === 0) break;
+        // 3. Gera a melhor combinação de matérias para este semestre (Greedy dentro da recursão)
+        const semestreAtual = { nome: `${ano}.${semN}`, materiasAlocadas: [] };
+        const alocadasAgora = [];
 
-        planoGerado.push(semestreAtual);
-        semestreAtual.materiasAlocadas.forEach(m => {
-            materiasConcluidasSet.add(m.id);
-            totalCreditosAcumulados += m.creditos;
-            materiasPendentes = materiasPendentes.filter(p => p.id !== m.id);
+        for (const m of disponiveis) {
+            if (!verificarConflitoDeHorario(m, semestreAtual.materiasAlocadas)) {
+                semestreAtual.materiasAlocadas.push(m);
+                alocadasAgora.push(m);
+            }
+        }
+
+        if (alocadasAgora.length === 0) return; // Travamento
+
+        // 4. Avança para o próximo nível (próximo semestre)
+        const novoConcluidas = new Set(concluidasSet);
+        let novoTotalCreditos = totalCreditos;
+        alocadasAgora.forEach(m => {
+            novoConcluidas.add(m.id);
+            novoTotalCreditos += m.creditos;
         });
 
-        if (semestreN === 2) { semestreN = 1; anoAtual++; } else semestreN = 2;
+        planoAtual.push(semestreAtual);
+        const novoAno = (semN === 2) ? ano + 1 : ano;
+        const novoSem = (semN === 2) ? 1 : 2;
+
+        simular(
+            materiasRestantes.filter(m => !alocadasAgora.includes(m)),
+            novoConcluidas,
+            novoTotalCreditos,
+            planoAtual,
+            novoAno,
+            novoSem
+        );
+
+        planoAtual.pop(); // Backtrack
     }
+
+    // Inicia a busca a partir de 2026.1
+    simular(materiasPendentesGlobais, materiasIniciaisSet, creditosIniciaisAcumulados, [], 2026, 1);
+
+    if (!melhorPlano) throw new Error("Não foi possível encontrar uma combinação válida até o fim do curso.");
     
-    return planoGerado;
+    return melhorPlano;
 }
 
 export function getMateriasPendentes() {
@@ -102,7 +118,7 @@ export function verificarPreRequisitosCumpridos(materia, materiasConcluidasIds, 
 }
 
 export function verificarConflitoDeHorario(novaMateria, materiasDoSemestre) {
-    if (!novaMateria.horarios) return false;
+    if (!novaMateria.horarios || novaMateria.horarios.length === 0) return false;
     for (const hN of novaMateria.horarios) {
         for (const mE of materiasDoSemestre) {
             if (!mE.horarios) continue;
