@@ -85,90 +85,19 @@ function handleSidebarClick(e) {
         verificarConclusaoPeriodo(target.dataset.periodoPai);
         updateAll();
     }
-    if (target.classList.contains('periodo-checkbox')) {
-        const periodo = target.dataset.periodo;
-        const isChecked = target.checked;
-        let podeMarcar = true;
-        if(isChecked){
-            DADOS_CURSO[periodo].forEach(materia => {
-                const materiaDiv = document.getElementById(materia.id);
-                if(materiaDiv && materiaDiv.classList.contains('prereq-nao-cumprido')) podeMarcar = false;
-            });
-        }
-        if(!podeMarcar){
-            target.checked = false;
-            alert("Não é possível concluir o período pois ele contém matérias com pré-requisitos pendentes.");
-            return;
-        }
-        target.closest('.periodo-header').querySelector('.periodo-header-label').classList.toggle('concluido', isChecked);
-        document.querySelectorAll(`[data-periodo-pai="${periodo}"]`).forEach(chk => {
-            if (chk.checked !== isChecked) chk.click();
-        });
-    }
-}
-
-function handleDragStart(e) {
-    const target = e.target;
-    let data = {};
-    if (target.matches('.materia')) {
-        const materia = findMateriaById(target.id);
-        if (!materia) { e.preventDefault(); return; }
-        if ((alocacaoCreditos[materia.id] || 0) >= materia.creditos) {
-            alert(`A matéria "${materia.nome}" já foi totalmente alocada na grade.`);
-            e.preventDefault(); return;
-        }
-        if (target.classList.contains('concluida') || target.classList.contains('prereq-nao-cumprido')) {
-            e.preventDefault();
-            if (target.classList.contains('prereq-nao-cumprido')) {
-                let erros = [];
-                if (materia.preRequisitos.cursos) {
-                    materia.preRequisitos.cursos.forEach(preReqId => {
-                        const chk = document.querySelector(`.materia-checkbox[data-materia-id="${preReqId}"]`);
-                        if (!chk || !chk.checked) erros.push(findMateriaById(preReqId).nome + " (não concluída)");
-                        if (document.querySelector(`.materia-agendada[data-materia-id="${preReqId}"]`)) erros.push(findMateriaById(preReqId).nome + " (não pode cursar com pré-requisito no mesmo período)");
-                    });
-                }
-                if (materia.preRequisitos.creditos) {
-                    const inputExtras = document.getElementById('optativas-concluidas');
-                    const creditosExtras = inputExtras ? parseInt(inputExtras.value) || 0 : 0;
-                    const totalGeral = creditosConcluidos + creditosExtras;
-                    if (totalGeral < materia.preRequisitos.creditos) {
-                        erros.push(`${materia.preRequisitos.creditos} créditos concluídos (você tem ${totalGeral})`);
-                    }
-                }
-                if (erros.length > 0) alert(`Pré-requisitos não cumpridos para ${materia.nome}:\n\n- ${[...new Set(erros)].join('\n- ')}`);
-            }
-            return;
-        }
-        data = { id: materia.id, source: 'sidebar' };
-    } else if (target.matches('.materia-agendada')) {
-            data = { id: target.dataset.materiaId, source: 'grid' };
-    } else {
-        e.preventDefault(); return;
-    }
-    e.dataTransfer.setData('application/json', JSON.stringify(data));
-    draggedItem = target;
-    setTimeout(() => target.classList.add('dragging'), 0);
 }
 
 async function handleGradeClick(e) {
     const target = e.target;
-    
     if (target.closest('.otimizar-grade-btn')) {
         const loadingOverlay = document.getElementById('loading-overlay');
         loadingOverlay.classList.remove('hidden');
-        
         setTimeout(async () => {
             try {
                 const plano = await gerarPlanoOtimizado();
-                if (plano && plano.length > 0) {
-                    await exportarPlanoOtimizadoParaPDF(plano);
-                } else {
-                    alert("Parabéns! Todas as matérias obrigatórias já foram concluídas.");
-                }
+                if (plano && plano.length > 0) await exportarPlanoOtimizadoParaPDF(plano);
             } catch (error) {
-                console.error("Erro ao gerar o plano otimizado:", error);
-                alert("Ocorreu um erro ao gerar o plano: " + error.message);
+                alert(error.message);
             } finally {
                 loadingOverlay.classList.add('hidden');
             }
@@ -177,16 +106,11 @@ async function handleGradeClick(e) {
     }
 
     if (target.closest('.limpar-grade-btn')) {
-        if (confirm("Você tem certeza que deseja limpar toda a grade e o progresso? Esta ação não pode ser desfeita.")) {
-            const gradeContainer = target.closest('.periodo-grade-semanal');
-            gradeContainer.querySelectorAll('.materia-agendada').forEach(el => el.remove());
-            document.querySelectorAll('.materia-checkbox:checked').forEach(chk => chk.click());
-            document.querySelectorAll('.remover-custom-btn').forEach(btn => btn.click());
+        if (confirm("Limpar tudo?")) {
             const extraInput = document.getElementById('optativas-concluidas');
             if (extraInput) extraInput.value = 0;
-            
             resetarAlocacaoCreditos();
-            updateAll();
+            location.reload(); // Forma mais segura de limpar estados complexos
         }
         return;
     }
@@ -200,33 +124,30 @@ async function handleGradeClick(e) {
     if (removerBtn) {
         const materiaAgendada = removerBtn.closest('.materia-agendada');
         const materiaId = materiaAgendada.dataset.materiaId;
-        const materiaOriginal = findMateriaById(materiaId);
-
-        const creditosAlocados = removerAlocacaoMateria(materiaId); 
-        
-        document.querySelectorAll(`.materia-agendada[data-materia-id="${materiaId}"]`).forEach(instancia => {
-            if (instancia !== materiaAgendada && materiaOriginal.creditos > 1) {
-                instancia.querySelector('.materia-nome').textContent = `${materiaOriginal.nome} (${creditosAlocados}/${materiaOriginal.creditos})`;
-            }
-        });
-
-        if (!materiaId.startsWith('opt-') && !materiaId.startsWith('out-') && creditosAlocados < materiaOriginal.creditos) {
-            const sidebarCheckbox = document.querySelector(`.materia-checkbox[data-materia-id="${materiaId}"]`);
-            if (sidebarCheckbox && sidebarCheckbox.checked) {
-                sidebarCheckbox.click();
-            }
-        }
+        removerAlocacaoMateria(materiaId);
         materiaAgendada.remove();
+        updateAll();
     }
+}
+
+function handleDragStart(e) {
+    const target = e.target;
+    let data = {};
+    if (target.matches('.materia')) {
+        data = { id: target.id, source: 'sidebar' };
+    } else if (target.matches('.materia-agendada')) {
+        data = { id: target.dataset.materiaId, source: 'grid' };
+    } else return;
+    
+    e.dataTransfer.setData('application/json', JSON.stringify(data));
+    draggedItem = target;
+    setTimeout(() => target.classList.add('dragging'), 0);
 }
 
 function init() {
     inicializarUI();
     gerarSidebar();
-    
-    // Data inicial fixada em 2026.1
     gerarGradePeriodo(`2026.1`);
-    
     updateAll();
 }
 
@@ -236,6 +157,6 @@ gradesWrapper.addEventListener('drop', handleDrop);
 gradesWrapper.addEventListener('click', handleGradeClick);
 sidebarContent.addEventListener('click', handleSidebarClick);
 document.addEventListener('dragstart', handleDragStart);
-document.addEventListener('dragend', e => { if (draggedItem) draggedItem.classList.remove('dragging'); draggedItem = null; });
+document.addEventListener('dragend', () => { if (draggedItem) draggedItem.classList.remove('dragging'); draggedItem = null; });
 
 init();

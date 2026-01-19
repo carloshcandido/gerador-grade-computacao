@@ -206,22 +206,30 @@ export function gerarGradePeriodo(nome) {
     const controlesDiv = document.createElement('div');
     controlesDiv.className = 'controles';
     
+    // Checkbox TCC
     const priorizarTccLabel = document.createElement('label');
-    priorizarTccLabel.style.cssText = 'font-size: 0.8em; display: flex; align-items: center; gap: 5px; cursor: pointer; color: #495057; font-weight: bold; margin-right: 5px;';
+    priorizarTccLabel.style.cssText = 'font-size: 0.8em; display: flex; align-items: center; gap: 5px; cursor: pointer; color: #495057; font-weight: bold;';
     priorizarTccLabel.innerHTML = `<input type="checkbox" id="priorizar-tcc-check"> Priorizar TCC`;
+
+    // Checkbox Tempo (Nova lógica de caminho crítico)
+    const priorizarTempoLabel = document.createElement('label');
+    priorizarTempoLabel.style.cssText = 'font-size: 0.8em; display: flex; align-items: center; gap: 5px; cursor: pointer; color: #495057; font-weight: bold; margin-right: 10px;';
+    priorizarTempoLabel.innerHTML = `<input type="checkbox" id="priorizar-tempo-check"> Priorizar Tempo`;
 
     const limparBtn = document.createElement('button');
     limparBtn.className = 'btn-acao limpar-grade-btn';
     limparBtn.innerHTML = '&#x1F5D1;';
     limparBtn.title = "Limpar grade e progresso";
+    
     const exportBtn = document.createElement('button');
     exportBtn.className = 'btn-acao export-periodo-pdf-btn';
     exportBtn.textContent = 'Exportar PDF';
+    
     const otimizarBtn = document.createElement('button');
     otimizarBtn.className = 'btn-acao otimizar-grade-btn';
     otimizarBtn.innerHTML = '✨ Gerar Grade Otimizada';
-    otimizarBtn.title = 'Gera um plano de estudos otimizado para concluir o curso';
-    controlesDiv.append(priorizarTccLabel, limparBtn, exportBtn, otimizarBtn);
+    
+    controlesDiv.append(priorizarTccLabel, priorizarTempoLabel, limparBtn, exportBtn, otimizarBtn);
     gradeHeader.append(titulo, controlesDiv);
     
     const tabela = document.createElement('table');
@@ -337,8 +345,8 @@ export function atualizarContador() {
 
 export function exportarGradeParaPDF(gradeElement) {
     const botoes = gradeElement.querySelectorAll('.btn-acao');
-    const checkboxTcc = gradeElement.querySelector('#priorizar-tcc-check')?.parentElement;
-    if (checkboxTcc) checkboxTcc.style.visibility = 'hidden';
+    const controlesExtra = gradeElement.querySelectorAll('label'); // Esconde os checkboxes Priorizar
+    controlesExtra.forEach(l => l.style.visibility = 'hidden');
     botoes.forEach(b => b.style.visibility = 'hidden');
     
     const titulo = gradeElement.querySelector('h3').textContent || 'periodo';
@@ -351,6 +359,6 @@ export function exportarGradeParaPDF(gradeElement) {
 
     html2pdf().from(gradeElement).set(opt).save().then(() => {
         botoes.forEach(b => b.style.visibility = 'visible');
-        if (checkboxTcc) checkboxTcc.style.visibility = 'visible';
+        controlesExtra.forEach(l => l.style.visibility = 'visible');
     });
 }
