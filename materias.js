@@ -49,7 +49,7 @@ export const DADOS_CURSO = {
         { id: '6P2', nome: 'Ondulatória e Física Moderna', creditos: 4, preRequisitos: { cursos: ['2P4', '3P2'] }, horarios: [{ dia: 1, slots: [5, 6] }, { dia: 3, slots: [5, 6] }] },
         { id: '6P3', nome: 'Servidores de Redes', creditos: 6, preRequisitos: { cursos: ['5P3'] }, horarios: [{ dia: 4, slots: [5, 6] }, { dia: 5, slots: [8, 9, 10, 11] }] },
         { id: '6P4', nome: 'Lab. de Circuitos Elétricos e Eletrônicos', creditos: 2, preRequisitos: { cursos: ['5P4'] }, horarios: [{ dia: 5, slots: [5, 6] }] },
-        { id: '6P5', nome: 'Eletrônica Analógica', creditos: 4, preRequisitos: { cursos: ['5P4'] }, horarios: [{ dia: 1, slots: [2, 4] }, { dia: 2, slots: [0] }] },
+        { id: '6P5', nome: 'Eletrônica Analógica', creditos: 4, preRequisitos: { cursos: ['5P4'] }, horarios: [{ dia: 1, slots: [2, 4] }, { dia: 2, slots: [0, 1] }] },
         { id: '6P6', nome: 'Linguagens Formais e Autômatos', creditos: 3, preRequisitos: { cursos: ['4P5'] }, horarios: [{ dia: 3, slots: [8, 9, 10] }] },
         { id: '6P7', nome: 'Análise de Algoritmos', creditos: 4, preRequisitos: { cursos: ['4P5'] }, horarios: [{ dia: 2, slots: [2, 4] }, { dia: 5, slots: [0, 1] }] }
     ],
